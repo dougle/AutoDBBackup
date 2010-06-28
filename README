@@ -26,6 +26,7 @@ OPTIONS:
            Remember to: chmod 0600 /path/to/file
 
 
+I set mysql to flush to disk more often, if you find that changes are not being picked up try changing the setting in my.cnf
 
 TODO: Add some required options and some options for svn or git
 Forks, Patches, Feature requests, Bug reports, Comments, Bash tips welome.
