@@ -1,0 +1,31 @@
+This script, if run each hour will check the mod time of the mysql data files and dump them to an sql file and commit the result.
+
+To install:
+$ wget http://github.com/dougle/AutoDBBackup/raw/master/AutoDBBackup -o /usr/bin/auto_db_backup && \
+  chmod +x /usr/bin/auto_db_backup
+
+in /etc/crontab:
+0 * * * * root auto_db_backup -c /root/mysql_backup.cnf -m catalog -d /var/www/default/sql_backups
+
+OPTIONS:
+   -h      Show this message
+   -d      Destination directory                      -d "/var/www/default/sql_backups"
+   -m      Name of the mysql db to use                -m "online_catalog"
+   -s      SCM to use (none,git,svn,auto)             -s "git"
+            default: autodetect .svn or .git
+            directories in the destination directory
+   -k      Keep this number of backups
+   -c      The absolute location of a mysql config    -c "/root/mysql_backup.cnf"
+           file for additional options:
+
+					[mysqldump]
+					host     = localhost
+					user     = backup
+					password = strongpassword
+
+           Remember to: chmod 0600 /path/to/file
+
+
+
+TODO: Add some required options and some options for svn or git
+Forks, Patches, Feature requests, Bug reports, Comments, Bash tips welome.

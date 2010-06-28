@@ -1,0 +1,114 @@
+#!/bin/bash
+
+usage()
+{
+cat << EOF
+usage: $0 options
+
+This script monitors the mysql data folder and then uses mysqldump when it detects a change.
+The .sql file can be automatically commited if using a SCM (svn or git ATM) 
+
+OPTIONS:
+   -h      Show this message
+   -d      Destination directory                      -d "/var/www/default/sql_backups"
+   -m      Name of the mysql db to use                -m "online_catalog"
+   -s      SCM to use (none,git,svn,auto)             -s "git"
+            default: autodetect .svn or .git
+            directories in the destination directory
+   -k      Keep this number of backups
+   -c      The absolute location of a mysql config    -c "/root/mysql_backup.cnf"
+           file for additional options:
+
+					[mysqldump]
+					host     = localhost
+					user     = backup
+					password = strongpassword
+
+           Remember to: chmod 0600 /path/to/file
+EOF
+}
+
+
+DESTINATION=
+DATABASE=
+SCM='auto'
+EXTRA_CONFIG=
+ROTATE_NUMBER=5
+
+
+while getopts “c:d:hm:s:” OPTION
+do
+     case $OPTION in
+     		c)
+     			 EXTRA_CONFIG=$OPTARG
+     			 ;;
+         d)
+             DESTINATION=$OPTARG
+             ;;
+         h)
+             usage
+             exit 1
+             ;;
+         k)
+         	 ROTATE_NUMBER=$OPTARG
+         	 ;;
+         m)
+             DATABASE=$OPTARG
+             ;;
+         s)
+         	 # only if it is one of:
+         	 if [ $OPTARG == 'none'] || [ $OPTARG == 'svn'] || [ $OPTARG == 'git'] || [ $OPTARG == 'auto'];then
+             	SCM=$OPTARG
+             fi
+             ;;
+         ?)
+             usage
+             exit
+             ;;
+     esac
+done
+
+mkdir -p "$DESTINATION"
+REF_FILE=`ls -t "$DESTINATION" | awk 'NR<2'`
+CHANGED=
+if [[ ! -z "$REF_FILE" ]]; then
+	CHANGED=`find /var/lib/mysql/$DATABASE/ -newer "$DESTINATION/$REF_FILE"`
+else
+	CHANGED="force change"
+fi
+
+if [[ ! -z "$CHANGED" ]]; then
+	CURRENT_DATE=`date --rfc-3339=seconds`
+	mysqldump --defaults-extra-file="$EXTRA_CONFIG" $DATABASE > "$DESTINATION/$DATABASE - $CURRENT_DATE.sql"
+  # find all files from this script in the destination directory
+  # bar the latest X number of files, then create an rm call to the shell
+	ls -C1 -t $DESTINATION/$DATABASE* | awk "NR>$ROTATE_NUMBER" | sed -e "s/^/rm '/" -e "s/$/'/" | sh
+	
+	# add the new file and commit all backups
+	if [[ "$SCM" != "none" ]]; then
+		if [[ "$SCM" = "auto" ]]; then
+			# find out what we are using
+			ls "$DESTINATION/.svn"
+			if [[ $? -eq 0  ]];then
+				SCM="svn"
+			fi
+
+			ls "$DESTINATION/.git"
+			if [[ $? -eq 0  ]];then
+				SCM="git"
+			fi
+		fi
+		
+		COMMIT_MESSAGE="AutoDBBackup $CURRENT_DATE"
+		case "$SCM" in
+			svn)
+					svn add $DESTINATION/$DATABASE*
+					svn commit -m "$COMMIT_MESSAGE" $DESTINATION/$DATABASE*
+					;;
+			git)
+					git add $DESTINATION/$DATABASE*
+					git commit -m "$COMMIT_MESSAGE" $DESTINATION/$DATABASE*
+					;;
+		esac
+	fi
+fi
