@@ -36,7 +36,7 @@ EXTRA_CONFIG=
 ROTATE_NUMBER=5
 
 
-while getopts “c:d:hm:s:” OPTION
+while getopts "c:d:hm:s:" OPTION
 do
      case $OPTION in
      		c)
@@ -68,6 +68,9 @@ do
      esac
 done
 
+# take trailing slash from destination
+DESTINATION=`echo "$DESTINATION" | sed 's|/$||'`
+
 mkdir -p "$DESTINATION"
 REF_FILE=`ls -t "$DESTINATION" | awk 'NR<2'`
 CHANGED=
@@ -92,11 +95,20 @@ if [[ ! -z "$CHANGED" ]]; then
 			if [[ $? -eq 0  ]];then
 				SCM="svn"
 			fi
-
-			ls "$DESTINATION/.git"
-			if [[ $? -eq 0  ]];then
-				SCM="git"
-			fi
+		fi
+		if [[ "$SCM" = "auto" ]]; then
+			# find a git directory
+			CURRENT_DIR="/var/www/voices/sql_dumps"
+			while [[ ! -z $CURRENT_DIR ]]; do
+				ls "$CURRENT_DIR/.git"
+				if [[ $? -eq 0  ]];then
+					SCM="git"
+					break;
+				else
+					# change to the parent directory
+					CURRENT_DIR=`dirname "$CURRENT_DIR"`
+				fi
+			done
 		fi
 		
 		COMMIT_MESSAGE="AutoDBBackup $CURRENT_DATE"
